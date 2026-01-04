@@ -1,0 +1,59 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: auth_mysql
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    ports:
+      - "${MYSQL_PORT}:3306"
+    networks:
+      - auth_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db_init:
+    image: mysql:8.0
+    container_name: auth_db_init
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./auth/init.sql:/init.sql
+    networks:
+      - auth_net
+    command: >
+      sh -c "
+      mysql -h db -u root -p$MYSQL_ROOT_PASSWORD < /init.sql
+      "
+    restart: "no"
+
+  auth:
+    build:
+      context: ./auth
+    image: auth-service:latest
+    container_name: auth_app
+    depends_on:
+      - db
+    env_file:
+      - .env
+    ports:
+      - "${AUTH_PORT}:8000"
+    networks:
+      - auth_net
+    command: >
+      uvicorn app:app --host 0.0.0.0 --port 8000
+
+networks:
+  auth_net:
+    driver: bridge
+
+volumes:
+  mysql_data:
