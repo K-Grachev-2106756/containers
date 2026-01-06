@@ -139,3 +139,83 @@ services:
 docker-compose up auth
 ```
 Остальные сервисы не стартуют, кроме тех, от которых зависит auth через depends_on.
+
+
+## hw 3
+
+### Проверка, что куб установлен
+![check_kube](/report_source/hw_3_1_check_kube.png)
+
+### Создание ресурсов postgres
+![create_resources](/report_source/hw_3_2_create_resources.png)
+
+Порядок выполнения манифестов важен - ресурсы должны существовать до того как их начнут использовать.
+К примеру, Secret и ConfigMap должны создаваться раньше пода, т.к. переменные этих ресурсов используются в Deployment секции.
+
+### Проверка ресурсов postgres
+![check_resources](/report_source/hw_3_3_check_resources.png)
+
+### Создание ресурсов nextcloud
+![create_nextcloud](/report_source/hw_3_4_create_nextcloud.png)
+
+### Логи пода nextcloud
+![nextcloud_logs](/report_source/hw_3_5_nextcloud_logs.png)
+
+### Перенаправленный порт nextcloud
+![nextcloud_port](/report_source/hw_3_6_nextcloud_port.png)
+
+### Веб-интерфейс nextcloud
+![nextcloud_works](/report_source/hw_3_7_nextcloud_works.png)
+
+Если вдруг выключить postgres:
+```
+kubectl scale deployment postgres --replicas=0
+```
+  -> `deployment.apps/postgres scaled`
+
+  -> Веб-интерфейс выдает `"Не удаётся установить соединение с сайтом, Соединение было прервано."`
+```
+kubectl get pods
+``` 
+  -> остался только под nextcloud
+```
+kubectl logs nextcloud-67dd7c8d98-7htbn
+```
+  -> `"GET /status.php HTTP/1.1" 500 410 "-" "kube-probe/1.34"`
+
+  -> `[mpm_prefork:notice] [pid 1:tid 1] AH00170: caught SIGWINCH, shutting down gracefully`
+
+```
+kubectl get pods
+```
+  -> Под nextcloud начал перезапускаться
+
+```
+kubectl scale deployment postgres --replicas=1
+```
+  -> Под postgres появился
+  
+  -> Под nextcloud перезапустился
+
+  -> Веб-интерфейс снова доступен
+
+```
+kubectl get pvc
+```
+  -> No resources found in default namespace.
+
+Таким образом, postgres развёрнут через Deployment без PersistentVolume.
+При масштабировании реплик до 0 Pod удаляется, вместе с временным хранилищем.
+При повторном запуске база инициализируется заново с теми же кредами, но без старых данных.
+
+### Веб-интерфейс kubernetes
+![kubernetes_UI](/report_source/hw_3_8_kubernetes_UI.png)
+
+### Проверка secret для postgres
+![create_postgres_secret](/report_source/hw_3_9_create_postgres_secret.png)
+
+### Проверка configmap для nextcloud
+![create_nextcloud_configmap](/report_source/hw_3_10_create_nextcloud_configmap.png)
+
+### Работа liveness readiness проб
+![nextcloud_liveness_readiness](/report_source/hw_3_11_nextcloud_liveness_readiness.png)
