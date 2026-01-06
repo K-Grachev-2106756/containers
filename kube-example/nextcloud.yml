@@ -15,8 +15,11 @@ metadata:
   labels:
     app: nextcloud
 data:
-  NEXTCLOUD_UPDATE: '1'
-  ALLOW_EMPTY_PASSWORD: 'yes'
+  NEXTCLOUD_UPDATE: "1"
+  ALLOW_EMPTY_PASSWORD: "yes"
+  NEXTCLOUD_TRUSTED_DOMAINS: "*"
+  NEXTCLOUD_ADMIN_USER: nc_admin
+  POSTGRES_HOST: postgres-service
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -37,37 +40,33 @@ spec:
       containers:
       - name: nextcloud
         image: docker.io/nextcloud:stable-apache
-        resources:
-          limits:
-            cpu: 500m
-            memory: 256Mi
-          requests:
-            cpu: 250m
-            memory: 128Mi
         ports:
         - name: http
           containerPort: 80
           protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /status.php
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /status.php
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        envFrom:
+          - configMapRef:
+              name: nextcloud-configmap
         env:
-        - name: NEXTCLOUD_UPDATE
-          valueFrom:
-            configMapKeyRef:
-              name: nextcloud-configmap
-              key: NEXTCLOUD_UPDATE
-        - name: ALLOW_EMPTY_PASSWORD
-          valueFrom:
-            configMapKeyRef:
-              name: nextcloud-configmap
-              key: ALLOW_EMPTY_PASSWORD
-        - name: POSTGRES_HOST
-          value: postgres-service
         - name: POSTGRES_DB
           valueFrom:
             configMapKeyRef:
               name: postgres-configmap
               key: POSTGRES_DB
-        - name: NEXTCLOUD_TRUSTED_DOMAINS
-          value: "127.0.0.1"
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
@@ -78,8 +77,6 @@ spec:
             secretKeyRef:
               name: postgres-secret
               key: POSTGRES_PASSWORD
-        - name: NEXTCLOUD_ADMIN_USER
-          value: nc_admin
         - name: NEXTCLOUD_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
