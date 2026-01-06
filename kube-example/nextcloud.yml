@@ -54,13 +54,13 @@ spec:
           value: "127.0.0.1"
         - name: POSTGRES_USER
           valueFrom:
-            configMapKeyRef:
-              name: postgres-configmap
+            secretKeyRef:
+              name: postgres-secret
               key: POSTGRES_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
-            configMapKeyRef:
-              name: postgres-configmap
+            secretKeyRef:
+              name: postgres-secret
               key: POSTGRES_PASSWORD
         - name: NEXTCLOUD_ADMIN_USER
           value: nc_admin
