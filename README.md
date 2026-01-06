@@ -219,3 +219,93 @@ kubectl get pvc
 
 ### Работа liveness readiness проб
 ![nextcloud_liveness_readiness](/report_source/hw_3_11_nextcloud_liveness_readiness.png)
+
+
+## hw 4
+
+### Сборка и запуск
+
+1) Добавляем локальный образ внутрь куба
+
+powershell:
+```
+minikube docker-env | Invoke-Expression
+```
+bash:
+```
+eval $(minikube docker-env)
+```
+Собираем образ:
+```
+docker build -t auth-service:latest ./auth/.
+```
+
+2) Добавляем ресурсы:
+```
+cd ./kube-prj
+kubectl create -f ./mysql-secret.yml
+kubectl create -f ./mysql-pvc.yml
+kubectl create -f ./mysql-init.yml
+kubectl create -f ./mysql-service.yml
+kubectl create -f ./mysql-deployment.yml
+kubectl create -f ./auth-configmap.yml
+kubectl create -f ./auth-service.yml
+kubectl create -f ./auth-deployment.yml
+```
+
+В mysql-deployment.yml запускается скрипт для инициализации таблиц:
+```
+initContainers:
+  - name: render-init-sql
+    image: alpine:3.18
+    env:
+      - name: MYSQL_USER
+        valueFrom:
+          secretKeyRef:
+            name: mysql-secret
+            key: MYSQL_USER
+      - name: MYSQL_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: mysql-secret
+            key: MYSQL_PASSWORD
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache gettext
+        echo "Rendering init.sql"
+        envsubst < /tpl/init.sql.tpl > /out/init.sql
+        cat /out/init.sql
+    volumeMounts:
+      - name: mysql-init-tpl
+        mountPath: /tpl
+      - name: mysql-init-final
+        mountPath: /out
+```
+
+Проверяем, что скрипт отработал успешно и таблицы создались:
+![mysql_ready](/report_source/hw_4_1_mysql_ready.png)
+
+Проверяем, что сервис auth поднялся:
+![service_healthcheck](/report_source/hw_4_2_service_healthcheck.png)
+
+3) Запуск сервиса:
+```
+minikube service auth
+```
+
+Проверка работы (логин по несуществующим кредам):
+```
+curl -X POST http://127.0.0.1:50515/login  \
+-H "Content-Type: application/json"  \
+-d '{"email":"1","password":"2"}'
+```
+> {"detail":"Invalid credentials"}
+
+Из логов mysql:
+> INFO:     10.244.0.1:24945 - "POST /login HTTP/1.1" 401 Unauthorized
+
+Такое поведение является ожидаемым.
+
+Таким образом, все работает.
