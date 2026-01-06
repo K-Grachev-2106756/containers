@@ -8,6 +8,16 @@ type: Opaque
 stringData:
   NEXTCLOUD_ADMIN_PASSWORD: "nc_pswd"
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nextcloud-configmap
+  labels:
+    app: nextcloud
+data:
+  NEXTCLOUD_UPDATE: '1'
+  ALLOW_EMPTY_PASSWORD: 'yes'
+---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -40,9 +50,15 @@ spec:
           protocol: TCP
         env:
         - name: NEXTCLOUD_UPDATE
-          value: '1'
+          valueFrom:
+            configMapKeyRef:
+              name: nextcloud-configmap
+              key: NEXTCLOUD_UPDATE
         - name: ALLOW_EMPTY_PASSWORD
-          value: 'yes'
+          valueFrom:
+            configMapKeyRef:
+              name: nextcloud-configmap
+              key: ALLOW_EMPTY_PASSWORD
         - name: POSTGRES_HOST
           value: postgres-service
         - name: POSTGRES_DB
