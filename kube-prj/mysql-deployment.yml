@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+        - name: mysql-init-tpl
+          configMap:
+            name: mysql-init
+        - name: mysql-init-final
+          emptyDir: {}
+      initContainers:
+        - name: render-init-sql
+          image: alpine:3.18
+          env:
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              apk add --no-cache gettext
+              echo "Rendering init.sql"
+              envsubst < /tpl/init.sql.tpl > /out/init.sql
+              cat /out/init.sql
+          volumeMounts:
+            - name: mysql-init-tpl
+              mountPath: /tpl
+            - name: mysql-init-final
+              mountPath: /out
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: mysql-init-final
+              mountPath: /docker-entrypoint-initdb.d
+          ports:
+            - containerPort: 3306
